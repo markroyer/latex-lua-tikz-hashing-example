@@ -1,0 +1,436 @@
+\documentclass{beamer}
+\usetheme{default}
+
+\usepackage{calc}
+\usepackage{forloop}
+
+\usepackage{tikz}
+
+\usetikzlibrary{arrows,fit,calc,shapes.multipart,shadows,chains,snakes}
+
+\usepackage{lstcustom}
+
+\lstset{
+  language=C++,
+  style=eclipse,
+  showspaces=false, 
+  numbers=none,
+  frame=,
+  captionpos=b,
+  breaklines=true,
+  % From http://tex.stackexchange.com/questions/116534/lstlisting-line-wrapping
+  postbreak=\raisebox{0ex}[0ex][0ex]{\ensuremath{\color{red}\hookrightarrow\space}},
+  escapechar=\$
+}
+
+
+
+\title{Hashing}
+\subtitle{Linear Probing Example}
+\date{}
+\author{Mark Royer}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Start Lua stuff %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\directlua{dofile("array.lua")}
+\newcommand*{\displayArray}[3]{%
+  \directlua{tex.sprint(displayArray(\unexpanded{{#1}},#2,"\luaescapestring{#3}"))}
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% End Lua stuff %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+
+% Uncomment this for lua debug info and replace \directlua with
+% \directluadebug
+
+\newwrite\luadebug
+\immediate\openout\luadebug luadebug.lua
+\AtEndDocument{\immediate\closeout\luadebug}
+\newcommand\directluadebug{\immediate\write\luadebug}
+
+% End Lua debug info
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}[fragile]{Hash tables}
+
+\textbf{Hash Tables} are containers that support constant time ($O(1)$)
+performance for the following operations:
+
+\begin{itemize}
+
+  \item Insert
+  \item Remove
+  \item Find
+
+\end{itemize}
+
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}[fragile]{Searching with hash tables}
+
+\begin{itemize}
+\item Suppose you are modeling customers, and that they are uniquely
+  identified by a telephone number.  The telephone number is the
+  \textbf{key} used for searching.
+
+\item If an array could be established with indices $0 \dots 9999999$,
+  the key could be used as the array index yielding direct access in
+  constant run-time.  
+
+\item For example, if the customers array is called
+  \lstinline$customers$ then
+
+  \begin{itemize}
+
+  \item \lstinline$customers[5813522]$ is the customer record with key 5813522
+    
+  \item  \lstinline$customers[5814433]$ is the customer record with key 5814433
+    
+  \end{itemize}
+  
+\end{itemize}
+
+\end{frame}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}[fragile]{Decreasing the array size}
+
+\begin{itemize}
+\item Since many applications will not contain all 10,000,000 telephone numbers,
+  an array is used with length approximately the number of customers
+  in the data set, say 1000.  
+
+\item This saves $9999000\text{int}\times\frac{4\text{B}}{1\text{int}}=39996000\text{B}\approx38\text{MB}$!
+
+\item This type of structure  is called a \textbf{hash table}.
+
+\item The phone number cannot now serve as the array index directly
+  because most of the numbers are greater than 999.
+
+\item Instead a \textbf{hash function} is used to map the phone number
+  to an index in the range $0 \dots 999$.
+
+\end{itemize}
+
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}[fragile]{Simple hash function}
+
+\begin{itemize}
+\item A simple hash function might use the first 3 digits of the phone number.
+
+\begin{lstlisting}[numbers=none]
+int hash(int key) {	
+  return   key / 10000;	
+}
+\end{lstlisting}
+
+\item The \textbf{hash function} defined above maps
+  telephone numbers into the array for storage and look-up.
+
+\item \lstinline$hash(4740997) == 474$ \\ \lstinline$customers[474]$ is
+  the location of the customer with telephone number 4740997.
+
+\item \lstinline$hash(5130795) == 513$ \\ \lstinline$customers[513]$ is
+  the location of the customer with telephone number 5130795.
+
+\end{itemize}
+
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}[fragile]{Collisions}
+
+\begin{itemize}
+
+\item Unfortunately, this simple algorithm easily leads to \textbf{collisions}.
+
+\item Collisions occur when multiple keys map to the same array index
+  (\textbf{synonyms}). For example, the following telephone numbers
+  all hash to the same location.
+
+\begin{center}
+\lstinline$hash(5810997) == 581$ \\ 
+\lstinline$hash(5810795) == 581$ \\ 
+\lstinline$hash(5811145) == 581$ \\
+\end{center}
+
+
+\item Although collisions are inevitable, the better hash functions
+  minimize their occurrence.
+
+\end{itemize}
+
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}[fragile]{Division method}
+
+\begin{itemize}
+
+\item There are many hash function methods.  A common technique is the
+  \textbf{division method}.
+
+\item This function causes fewer collisions if the length of the table
+  is a prime number (eg. 1009).
+
+\item The revised hashing function
+
+\begin{lstlisting}[numbers=none]
+const int SIZE = 1009;
+
+int hash(int key) {
+  return (key % SIZE);
+}
+\end{lstlisting}
+
+\begin{center}
+\lstinline$hash(5810997) == 166$ \\ 
+\lstinline$hash(5810795) == 973$ \\ 
+\lstinline$hash(5811145) == 314$ \\
+\end{center}
+
+\end{itemize}
+
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}[fragile]{Collision resolution}
+
+\begin{itemize}
+
+\item When a collision occurs, two issues must be addressed:
+
+\begin{enumerate}
+
+\item Where will the item be inserted?
+
+\item How will the search algorithm find this item since it is not in its expected position?
+
+\end{enumerate}
+
+\end{itemize}
+
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}[fragile]{Open address collision resolution}
+
+\begin{itemize}
+
+\item Use some function to find an alternative index in the case of a
+  collision.  A collision occurs on key $k$ when
+  \lstinline$table[hash(k)]$ is already used.
+
+\item The \textbf{linear probing} strategy tests array elements sequentially
+  until it finds an empty slot (here filled with flag -1).
+
+\item Each attempt to insert into a location in the table is called a \textbf{probe}.
+
+\end{itemize}
+
+\begin{center}
+\resizebox{10.0cm}{!}{%
+  \begin{tikzpicture}
+   \displayArray{-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1}{-1}{table:}
+  \end{tikzpicture}
+}%
+\end{center}
+
+
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}[fragile]{Linear probing example}
+
+\begin{itemize}
+
+\item Insert elements \textcolor{yellow}{45}, 8, 35, 64, 3, 14 into a \textbf{hash table} of size 11.
+
+\item \textbf{Insert} 45
+
+\item \lstinline$hash(45)$\ $\Rightarrow 1$
+
+\item 1 is empty, insert 45.
+
+\end{itemize}
+
+\begin{center}
+\resizebox{10.0cm}{!}{%
+  \begin{tikzpicture}
+   \displayArray{-1,45,-1,-1,-1,-1,-1,-1,-1,-1,-1}{1}{table:}
+  \end{tikzpicture}
+}%
+\end{center}
+
+
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}[fragile]{Linear probing example}
+
+\begin{itemize}
+
+\item Insert elements 45, \textcolor{yellow}{8}, 35, 64, 3, 14 into a
+  \textbf{hash table} of size 11.
+
+\item \textbf{Insert} 8
+
+\item \lstinline$hash(8)$\ $\Rightarrow 8$
+
+\item 8 is empty, insert 8.
+
+\end{itemize}
+
+\begin{center}
+\resizebox{10.0cm}{!}{%
+  \begin{tikzpicture}
+   \displayArray{-1,45,-1,-1,-1,-1,-1,-1,8,-1,-1}{8}{table:}
+  \end{tikzpicture}
+}%
+\end{center}
+
+
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}[fragile]{Linear probing example}
+
+\begin{itemize}
+
+\item Insert elements 45, 8, \textcolor{yellow}{35}, 64, 3, 14 into a
+  \textbf{hash table} of size 11.
+
+\item \textbf{Insert} 35
+
+\item \lstinline$hash(35)$\ $\Rightarrow 2$
+
+\item 2 is empty, insert 35.
+
+\end{itemize}
+
+\begin{center}
+\resizebox{10.0cm}{!}{%
+  \begin{tikzpicture}
+   \displayArray{-1,45,35,-1,-1,-1,-1,-1,8,-1,-1}{2}{table:}
+  \end{tikzpicture}
+}%
+\end{center}
+
+
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}[fragile]{Linear probing example}
+
+\begin{itemize}
+
+\item Insert elements 45, 8, 35, \textcolor{yellow}{64}, 12, 14 into a \textbf{hash table} of size 11.
+
+\item \textbf{Insert} 64
+
+\item \lstinline$hash(64)$\ $\Rightarrow 9$
+
+\item 9 is empty, insert 64.
+
+\end{itemize}
+
+\begin{center}
+\resizebox{10.0cm}{!}{%
+  \begin{tikzpicture}
+   \displayArray{-1,45,35,-1,-1,-1,-1,-1,8,64,-1}{9}{table:}
+  \end{tikzpicture}
+}%
+\end{center}
+
+
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}[fragile]{Linear probing example}
+
+\begin{itemize}
+
+\item Insert elements 45, 8, 35, 64, \textcolor{yellow}{12}, 14 into a \textbf{hash table} of size 11.
+
+\item \textbf{Insert} 12
+
+\item \lstinline$hash(12)$\ $\Rightarrow 1$
+
+\item 1 is \textbf{not empty}, 
+\only<2->{ attempt hash(12)+1, 2 is \textbf{not empty},}
+\only<3->{ attempt hash(12)+2, 3 is empty, insert 12.}
+
+\end{itemize}
+
+\begin{center}
+\resizebox{10.0cm}{!}{%
+  \begin{tikzpicture}
+   \only<1>{\displayArray{-1,45,35,-1,-1,-1,-1,-1,8,64,-1}{1}{table:}}
+   \only<2>{\displayArray{-1,45,35,-1,-1,-1,-1,-1,8,64,-1}{2}{table:}}
+   \only<3>{\displayArray{-1,45,35,12,-1,-1,-1,-1,8,64,-1}{3}{table:}}
+  \end{tikzpicture}
+}%
+\end{center}
+
+
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}[fragile]{Linear probing example}
+
+\begin{itemize}
+
+\item Insert elements 45, 8, 35, 64, 12, \textcolor{yellow}{14} into a
+  \textbf{hash table} of size 11.
+
+\item \textbf{Insert} 14
+
+\item \lstinline$hash(14)$\ $\Rightarrow 3$
+
+\item 3 is \textbf{not empty},
+\only<2->{ attempt hash(14)+1, 4 is empty, insert 14.}
+
+\end{itemize}
+
+\begin{center}
+\resizebox{10.0cm}{!}{%
+  \begin{tikzpicture}
+\only<1>{\displayArray{-1,45,35,12,-1,-1,-1,-1,8,64,-1}{3}{table:}}
+\only<2>{\displayArray{-1,45,35,12,14,-1,-1,-1,8,64,-1}{4}{table:}}
+  \end{tikzpicture}
+}%
+\end{center}
+
+
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\end{document}
